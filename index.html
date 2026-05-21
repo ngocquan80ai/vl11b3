@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Học liệu Tương tác: Bài 3 - Vận tốc, Gia tốc trong Dao động điều hoà</title>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: { typeset: false } 
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+
+    <div id="app" v-cloak class="max-w-6xl mx-auto my-6 p-4">
+        
+        <header class="bg-gradient-to-r from-teal-700 to-cyan-700 p-5 rounded-xl text-white shadow-lg mb-6">
+            <h1 class="text-2xl md:text-3xl font-extrabold text-center">BÀI 3: VẬN TỐC VÀ GIA TỐC TRONG DAO ĐỘNG ĐIỀU HOÀ</h1>
+            <p class="text-sm md:text-base text-center text-teal-100 mt-2 font-medium">
+                Khảo sát định lượng và mối quan hệ pha đặc trưng giữa ba đại lượng $x - v - a$
+            </p>
+        </header>
+
+        <nav class="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-2">
+            <button 
+                v-for="tab in tabs" :key="tab.id"
+                @click="currentTab = tab.id"
+                :class="['px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 shadow-sm', 
+                         currentTab === tab.id ? 'bg-teal-600 text-white shadow-teal-200' : 'bg-white text-slate-600 hover:bg-slate-50 border border-gray-200']">
+                {{ tab.name }}
+            </button>
+        </nav>
+
+        <section v-show="currentTab === 'tab1'" class="animate-fade-in bg-white p-6 rounded-xl shadow-md space-y-6">
+            <div class="border-l-4 border-teal-500 pl-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900">Phòng phân tích Động học Đồng bộ</h2>
+                    <p class="text-sm text-slate-600 mt-1">Kéo thanh trượt để quét thời gian và đối chiếu trạng thái pha, hướng vectơ giữa Li độ - Vận tốc - Gia tốc.</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div class="lg:col-span-1 bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between space-y-4">
+                    <div>
+                        <h3 class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-3">Điều khiển quét t</h3>
+                        
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-700 flex justify-between">
+                                <span>Thời điểm $t$:</span>
+                                <span class="text-teal-600 font-mono font-bold">{{ currentTime.toFixed(2) }} s</span>
+                            </label>
+                            <input 
+                                type="range" min="0" max="4.0" step="0.02" 
+                                v-model.number="currentTime" @input="updateCharts"
+                                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teal-600">
+                        </div>
+                    </div>
+
+                    <div class="space-y-2.5 pt-3 border-t border-slate-200">
+                        <h3 class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-1">Giá trị tức thời</h3>
+                        
+                        <div class="bg-white p-2.5 rounded-lg border-l-4 border-blue-500 shadow-sm flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-600">Li độ $x$:</span>
+                            <span class="font-mono text-sm font-black text-blue-600">{{ liveX }} <span class="text-[10px] text-slate-400 font-normal">cm</span></span>
+                        </div>
+
+                        <div class="bg-white p-2.5 rounded-lg border-l-4 border-amber-500 shadow-sm flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-600">Vận tốc $v$:</span>
+                            <span class="font-mono text-sm font-black text-amber-600">{{ liveV }} <span class="text-[10px] text-slate-400 font-normal">cm/s</span></span>
+                        </div>
+
+                        <div class="bg-white p-2.5 rounded-lg border-l-4 border-rose-500 shadow-sm flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-600">Gia tốc $a$:</span>
+                            <span class="font-mono text-sm font-black text-rose-600">{{ liveA }} <span class="text-[10px] text-slate-400 font-normal">cm/s²</span></span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-lg text-center text-xs font-bold transition-all shadow-inner"
+                         :class="Math.abs(parseFloat(liveX)) < 0.05 ? 'bg-slate-100 text-slate-500' : 'bg-rose-50 text-rose-700 border border-rose-100'">
+                        🎯 Hướng vectơ gia tốc $\vec{a}$:<br>
+                        <span class="text-sm tracking-wide font-black block mt-1">
+                            {{ Math.abs(parseFloat(liveX)) < 0.05 ? 'BẰNG 0 (Tại VTCB)' : (parseFloat(liveX) > 0 ? '⬇ HƯỚNG VỀ VTCB (Chiều âm)' : '⬆ HƯỚNG VỀ VTCB (Chiều dương)') }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-3 space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="bg-white p-2 rounded-lg shadow-sm border border-gray-100 relative h-36">
+                        <canvas id="canvasX"></canvas>
+                    </div>
+                    <div class="bg-white p-2 rounded-lg shadow-sm border border-gray-100 relative h-36">
+                        <canvas id="canvasV"></canvas>
+                    </div>
+                    <div class="bg-white p-2 rounded-lg shadow-sm border border-gray-100 relative h-36">
+                        <canvas id="canvasA"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section v-show="currentTab === 'tab2'" class="animate-fade-in bg-white p-6 rounded-xl shadow-md space-y-6">
+            <div class="border-l-4 border-cyan-500 pl-4">
+                <h2 class="text-xl font-bold text-slate-900">Mối liên hệ Động học giữa các Đại lượng</h2>
+                <p class="text-sm text-slate-600 mt-1">Hệ thống hóa các phương trình và bản chất toán học (đạo hàm) của dao động điều hòa.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="p-4 rounded-xl border border-slate-200 bg-blue-50/30">
+                    <h3 class="text-sm font-bold text-blue-700 uppercase tracking-wider mb-2">1. Phương trình Li độ</h3>
+                    <p class="text-xs text-slate-600 mb-3">Mô tả vị trí của vật theo thời gian:</p>
+                    <div class="bg-white p-3 rounded-lg border text-center font-mono text-sm text-slate-800 shadow-sm">
+                        $$x = A \cos(\omega t + \varphi)$$
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-xl border border-slate-200 bg-amber-50/30">
+                    <h3 class="text-sm font-bold text-amber-700 uppercase tracking-wider mb-2">2. Phương trình Vận tốc</h3>
+                    <p class="text-xs text-slate-600 mb-3">Là đạo hàm bậc nhất của li độ theo thời gian ($v = x'$):</p>
+                    <div class="bg-white p-3 rounded-lg border text-center font-mono text-sm text-slate-800 shadow-sm mb-2">
+                        $$v = -\omega A \sin(\omega t + \varphi)$$
+                    </div>
+                    <div class="bg-white p-2 rounded-lg border text-center font-mono text-xs text-slate-700 shadow-sm">
+                        $$v = \omega A \cos\left(\omega t + \varphi + \frac{\pi}{2}\right)$$
+                    </div>
+                    <p class="text-[11px] text-amber-800 font-semibold mt-2 flex items-center gap-1">
+                        <span>📌</span> Vận tốc sớm pha $\frac{\pi}{2}$ so với li độ.
+                    </p>
+                </div>
+
+                <div class="p-4 rounded-xl border border-slate-200 bg-rose-50/30">
+                    <h3 class="text-sm font-bold text-rose-700 uppercase tracking-wider mb-2">3. Phương trình Gia tốc</h3>
+                    <p class="text-xs text-slate-600 mb-3">Là đạo hàm bậc hai của li độ ($a = v' = x''$):</p>
+                    <div class="bg-white p-3 rounded-lg border text-center font-mono text-sm text-slate-800 shadow-sm mb-2">
+                        $$a = -\omega^2 A \cos(\omega t + \varphi)$$
+                    </div>
+                    <div class="bg-white p-2 rounded-lg border text-center font-mono text-xs text-slate-700 shadow-sm">
+                        $$a = \omega^2 A \cos(\omega t + \varphi + \pi) = -\omega^2 x$$
+                    </div>
+                    <p class="text-[11px] text-rose-800 font-semibold mt-2 flex items-center gap-1">
+                        <span>📌</span> Gia tốc ngược pha với li độ.
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                <h3 class="text-sm font-bold text-slate-800">🎯 Điểm cốt lõi cần nhớ từ Đồ thị & Biểu thức Toán học:</h3>
+                <ul class="list-disc pl-5 text-xs text-slate-700 space-y-1.5 leading-relaxed">
+                    <li>Khi vật qua <strong>Vị trí cân bằng ($x = 0$)</strong>: Vận tốc đạt độ lớn cực đại ($|v|_{max} = \omega A$), gia tốc bằng $0$.</li>
+                    <li>Khi vật ở <strong>Vị trí biên ($x = \pm A$)</strong>: Vận tốc bằng $0$, gia tốc đạt độ lớn cực đại ($|a|_{max} = \omega^2 A$).</li>
+                    <li>Dấu trừ trong biểu thức $a = -\omega^2 x$ khẳng định: <strong>Vectơ gia tốc $\vec{a}$ luôn ngược hướng với li độ, nghĩa là luôn luôn hướng về vị trí cân bằng</strong>.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section v-show="currentTab === 'tab3'" class="animate-fade-in bg-white p-6 rounded-xl shadow-md space-y-6">
+            <div class="border-l-4 border-emerald-500 pl-4">
+                <h2 class="text-xl font-bold text-slate-900">Ứng dụng Hệ thức Độc lập Thời gian</h2>
+                <p class="text-sm text-slate-600 mt-1">Biến đổi mối quan hệ vuông pha giữa $x - v$ và quan hệ tuyến tính giữa $a - x$.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-1 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4 flex flex-col justify-center">
+                    <div>
+                        <h3 class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-2">Hệ thức vuông pha $x - v$</h3>
+                        <div class="bg-white p-2.5 rounded-lg border text-center font-mono text-xs shadow-sm">
+                            $$\left(\frac{x}{A}\right)^2 + \left(\frac{v}{\omega A}\right)^2 = 1$$
+                        </div>
+                        <div class="bg-white p-2.5 rounded-lg border text-center font-mono text-sm shadow-sm mt-1.5 text-emerald-700 font-bold">
+                            $$v = \pm\omega\sqrt{A^2 - x^2}$$
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-200">
+                        <h3 class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-2">Hệ thức liên hệ $a - x$</h3>
+                        <div class="bg-white p-2.5 rounded-lg border text-center font-mono text-sm shadow-sm text-rose-700 font-bold">
+                            $$a = -\omega^2 x$$
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 bg-emerald-50/20 p-5 rounded-xl border border-emerald-100 space-y-4">
+                    <h3 class="text-sm font-bold text-emerald-800 flex items-center gap-1.5">
+                        🧮 Máy tính Động học Trạng thái (Thực hành Định lượng)
+                    </h3>
+                    <p class="text-xs text-slate-600">Thay đổi tọa độ của tịnh tiến Li độ $x$ trên thanh trượt để phần mềm tự động tính toán tức thời trạng thái Động học.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border shadow-sm">
+                        <div class="space-y-3 flex flex-col justify-center">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Chọn trạng thái vị trí</h4>
+                            
+                            <div class="space-y-1">
+                                <label class="text-xs font-semibold text-slate-700 flex justify-between">
+                                    <span>Li độ giả định $x$:</span>
+                                    <span class="text-emerald-600 font-mono font-bold">{{ calcX.toFixed(2) }} cm</span>
+                                </label>
+                                <input 
+                                    type="range" :min="-amplitude" :max="amplitude" step="0.05" 
+                                    v-model.number="calcX"
+                                    class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-600">
+                            </div>
+                            <p class="text-[10px] text-slate-400 italic leading-relaxed">
+                                * Máy tính kế thừa thông số hệ thống tự động từ Tab 1:<br>
+                                Biên độ $A = 5\text{ cm}$, Chu kì $T = 2\text{ s} \implies \omega = \pi \approx 3.14\text{ rad/s}$.
+                            </p>
+                        </div>
+
+                        <div class="space-y-2.5 border-t md:border-t-0 md:border-l border-slate-100 md:pl-4 pt-3 md:pt-0">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Giá trị Động học đầu ra</h4>
+                            
+                            <div class="p-2.5 rounded-lg bg-amber-50/70 border border-amber-200 flex justify-between items-center text-xs shadow-sm">
+                                <span class="font-bold text-slate-600">Vận tốc $v$:</span>
+                                <span class="font-mono font-black text-amber-700 text-sm">
+                                    &plusmn; {{ calcV }} <span class="text-[10px] font-normal text-slate-400">cm/s</span>
+                                </span>
+                            </div>
+
+                            <div class="p-2.5 rounded-lg bg-rose-50/70 border border-rose-200 flex justify-between items-center text-xs shadow-sm">
+                                <span class="font-bold text-slate-600">Gia tốc $a$:</span>
+                                <span class="font-mono font-black text-rose-700 text-sm">
+                                    {{ calcA }} <span class="text-[10px] font-normal text-slate-400">cm/s²</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section v-show="currentTab === 'tab4'" class="animate-fade-in bg-white p-6 rounded-xl shadow-md space-y-6">
+            <div class="border-l-4 border-rose-500 pl-4 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900">Đánh giá Năng lực Phân tích Đồ thị & Động học</h2>
+                    <p class="text-sm text-slate-600 mt-1">Hệ thống câu hỏi chống bẫy nhận thức, giúp khắc phục triệt để các sai lầm phổ biến về pha và hướng vectơ.</p>
+                </div>
+                <div class="bg-rose-50 border border-rose-100 px-4 py-2 rounded-xl text-center self-start md:self-auto shadow-sm">
+                    <span class="text-xs font-bold text-rose-700 block uppercase tracking-wider">Tiến độ hoàn thành</span>
+                    <span class="font-mono text-lg font-black text-rose-600">{{ score }} / {{ quizData.length }} <span class="text-xs font-normal text-slate-500">câu đúng</span></span>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div v-for="(q, index) in quizData" :key="q.id" class="p-5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-md text-xs font-black bg-slate-800 text-white shadow-sm">Câu {{ index + 1 }}</span>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">{{ q.type === 'choice' ? 'Trắc nghiệm lựa chọn' : 'Điền số ngắn' }}</span>
+                    </div>
+
+                    <p class="text-sm font-semibold text-slate-800 leading-relaxed" v-html="q.text"></p>
+
+                    <div v-if="q.type === 'choice'" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <button 
+                            v-for="option in q.options" :key="option.id"
+                            @click="selectOption(q, option)"
+                            :disabled="q.isAnswered"
+                            :class="['p-3 rounded-lg border text-left text-xs transition-all duration-200 shadow-sm flex items-start gap-2.5', getOptionClass(q, option)]">
+                            <span class="w-5 h-5 rounded-full border bg-white flex items-center justify-center font-bold flex-shrink-0"
+                                  :class="q.selectedOption?.id === option.id ? 'border-transparent text-white' : 'border-slate-300 text-slate-500'">
+                                {{ option.id }}
+                            </span>
+                            <span class="leading-relaxed" v-html="option.text"></span>
+                        </button>
+                    </div>
+
+                    <div v-if="q.type === 'input'" class="space-y-3">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <input 
+                                type="text" v-model="q.studentAnswer" :disabled="q.isAnswered"
+                                placeholder="Nhập đáp số..."
+                                class="px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-500 w-44 shadow-inner bg-white disabled:bg-slate-100 disabled:text-slate-500">
+                            <button 
+                                @click="checkInput(q)" :disabled="q.isAnswered || !q.studentAnswer.trim()"
+                                class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-lg shadow transition-colors disabled:opacity-40">
+                                Nộp câu trả lời
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="q.isAnswered" class="p-4 rounded-xl border animate-fade-in text-xs space-y-1.5 shadow-sm"
+                         :class="q.isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-rose-50 border-rose-200 text-rose-950'">
+                        <div class="flex items-center gap-1.5 font-bold text-sm">
+                            <span>{{ q.isCorrect ? '🎉 Tuyệt vời, chính xác!' : '❌ Cần lưu ý bẫy nhận thức!' }}</span>
+                        </div>
+                        <p class="leading-relaxed font-medium" v-html="q.feedback"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center pt-4 border-t border-slate-100">
+                <button 
+                    @click="resetQuiz"
+                    class="px-6 py-3 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white font-extrabold text-sm rounded-xl shadow-md transition-all duration-200 hover:shadow-lg active:scale-95">
+                    🔄 Làm lại toàn bộ thử thách
+                </button>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        const app = createApp({
+            data() {
+                return {
+                    tabs: [
+                        { id: 'tab1', name: '1. Khám phá đồ thị đồng bộ' },
+                        { id: 'tab2', name: '2. Lý thuyết trọng tâm' },
+                        { id: 'tab3', name: '3. Hệ thức độc lập' },
+                        { id: 'tab4', name: '4. Đánh giá năng lực' }
+                    ],
+                    currentTab: 'tab1',
+
+                    // THAM SỐ KHỞI TẠO DAO ĐỘNG
+                    amplitude: 5,       
+                    period: 2.0,        
+                    initialPhase: 0,    
+                    currentTime: 0.0,   
+                    
+                    // THAM SỐ HIỂN THỊ TỨC THỜI (TAB 1)
+                    liveX: '5.00',
+                    liveV: '0.00',
+                    liveA: '-49.35',
+                    
+                    // LƯU TRỮ RAW CHART OBJECT (TRÁNH OVERHEAD VUE REACTIVITY)
+                    chartX: null,
+                    chartV: null,
+                    chartA: null,
+
+                    // CACHE TRỤC HOÀNH (0s - 4.0s)
+                    timeLabels: Array.from({length: 201}, (_, i) => (i * 0.02).toFixed(2)),
+
+                    // BIẾN CHO MÁY TÍNH ĐỘNG HỌC (TAB 3)
+                    calcX: 3.0,
+
+                    // NGÂN HÀNG CÂU HỎI BẪY SƯ PHẠM (ESCAPE 4 BACKSLASH)
+                    quizData: [
+                        {
+                            id: 1, type: 'choice',
+                            text: 'Khi một vật dao động điều hoà di chuyển từ <strong>Vị trí biên về Vị trí cân bằng</strong>, nhận định nào sau đây về mối quan hệ giữa vectơ vận tốc $\\\\vec{v}$ và vectơ gia tốc $\\\\vec{a}$ là chính xác?',
+                            options: [
+                                { id: 'A', text: '$\\\\vec{v}$ và $\\\\vec{a}$ luôn ngược chiều nhau.', isCorrect: false, feedback: '<strong>Lỗi nhầm tính chất:</strong> Khi đi từ biên về VTCB, tốc độ của vật tăng dần. Trong cơ học, chuyển động nhanh dần khi và chỉ khi vectơ vận tốc và gia tốc <strong>cùng chiều nhau</strong>!' },
+                                { id: 'B', text: '$\\\\vec{v}$ và $\\\\vec{a}$ luôn cùng chiều nhau.', isCorrect: true, feedback: '<strong>Phân tích chuẩn xác:</strong> Khi đi từ biên về VTCB, vật chuyển động nhanh dần nên $\\\\vec{v}$ và $\\\\vec{a}$ cùng chiều. Vectơ gia tốc $\\\\vec{a}$ luôn hướng về VTCB, trong khi vật cũng đang tiến về VTCB, tức là chúng đồng hành cùng chiều.' },
+                                { id: 'C', text: '$\\\\vec{v}$ đổi chiều liên tục, còn $\\\\vec{a}$ luôn hướng ra xa vị trí cân bằng.', isCorrect: false, feedback: '<strong>Bị bẫy hướng vectơ:</strong> Bản chất cốt lõi của lực kéo về và gia tốc là chúng phải <em>luôn hướng về vị trí cân bằng</em> ($a = -\\\\omega^2 x$).' },
+                                { id: 'D', text: 'Độ lớn của vận tốc giảm dần, độ lớn của gia tốc tăng dần.', isCorrect: false, feedback: '<strong>Bẫy đồ thị ngược cực trị:</strong> Đi về VTCB thì li độ $x \\\\to 0$, do đó độ lớn gia tốc phải giảm dần về $0$. Ngược lại, vận tốc phải tăng tiến tới độ lớn cực đại.' }
+                            ],
+                            selectedOption: null, isAnswered: false, isCorrect: false, feedback: ''
+                        },
+                        {
+                            id: 2, type: 'choice',
+                            text: 'Dựa vào phân tích dạng đồ thị đồng bộ ở Tab 1, kết luận nào sau đây về <strong>độ lệch pha</strong> giữa Vận tốc và Li độ là đúng?',
+                            options: [
+                                { id: 'A', text: 'Vận tốc biến thiên trễ pha $\\\\frac{\\\\pi}{2}$ so với li độ.', isCorrect: false, feedback: '<strong>Bẫy hướng đi của pha:</strong> Hãy nhìn đồ thị hình sin: Tại thời điểm đỉnh cực đại của li độ ($x=A$) xuất hiện, thì đồ thị vận tốc đã đạt đỉnh cực đại trước đó một khoảng thời gian là $T/4$. Vì vậy vận tốc phải sớm pha hơn!' },
+                                { id: 'B', text: 'Vận tốc biến thiên sớm pha $\\\\frac{\\\\pi}{2}$ so với li độ.', isCorrect: true, feedback: '<strong>Chúc mừng, kết luận chính xác!</strong> Phương trình toán học $v = \\\\omega A \\\\cos(\\\\omega t + \\\\varphi + \\\\pi/2)$ và hình ảnh trực quan xếp chồng đều chứng minh vận tốc sớm pha $\\\\pi/2$ (vuông pha) so với li độ.' },
+                                { id: 'C', text: 'Vận tốc biến thiên ngược pha hoàn toàn với li độ.', isCorrect: false, feedback: '<strong>Lỗi nhầm đại lượng:</strong> Đại lượng ngược pha với li độ phải là gia tốc ($a = -\\\\omega^2 x$).' },
+                                { id: 'D', text: 'Vận tốc và li độ luôn đồng pha với nhau.', isCorrect: false, feedback: '<strong>Sai bản chất:</strong> Nếu đồng pha, vật sẽ đạt vận tốc lớn nhất tại vị trí biên, điều này hoàn toàn mâu thuẫn với thực tế chuyển động dừng lại ở biên để đảo chiều ($v=0$).' }
+                            ],
+                            selectedOption: null, isAnswered: false, isCorrect: false, feedback: ''
+                        },
+                        {
+                            id: 3, type: 'input',
+                            text: 'Một vật dao động điều hoà với biên độ $A = 5\\\\text{ cm}$ và chu kì $T = 2\\\\text{ s}$. Tại thời điểm vật có li độ $x = -3\\\\text{ cm}$, gia tốc của vật có giá trị bằng bao nhiêu $\\\\text{cm/s}^2$? (Lấy $\\\\pi^2 = 10$. Điền giá trị số nguyên nguyên bản vào ô trống).',
+                            correctAnswer: '30', studentAnswer: '', isAnswered: false, isCorrect: false,
+                            feedback: '<strong>Hướng dẫn giải thuật:</strong> Tần số góc $\\\\omega = \\\\frac{2\\\\pi}{T} = \\\\pi\\\\text{ (rad/s)} \\\\implies \\\\omega^2 = \\\\pi^2 = 10$. Áp dụng phương trình liên hệ: $a = -\\\\omega^2 x = -10 \\\\times (-3) = 30\\\\text{ cm/s}^2$.'
+                        }
+                    ]
+                }
+            },
+            
+            watch: {
+                currentTab(newTab) {
+                    this.triggerMathJax();
+                    if (newTab === 'tab1') {
+                        this.$nextTick(() => { this.initCharts(); });
+                    }
+                }
+            },
+
+            computed: {
+                calcV() {
+                    const omega = Math.PI; // T=2s
+                    const diff = this.amplitude * this.amplitude - this.calcX * this.calcX;
+                    if (diff <= 0) return '0.00'; 
+                    return (omega * Math.sqrt(diff)).toFixed(2);
+                },
+                calcA() {
+                    const omega = Math.PI;
+                    const acceleration = -omega * omega * this.calcX;
+                    return acceleration.toFixed(2);
+                },
+                score() {
+                    return this.quizData.filter(q => q.isCorrect).length;
+                }
+            },
+
+            mounted() {
+                this.triggerMathJax();
+                this.$nextTick(() => { this.initCharts(); });
+            },
+
+            methods: {
+                generateStaticCurves() {
+                    const dataX = []; const dataV = []; const dataA = [];
+                    const omega = Math.PI;
+                    
+                    this.timeLabels.forEach(tStr => {
+                        const t = parseFloat(tStr);
+                        const x = this.amplitude * Math.cos(omega * t + this.initialPhase);
+                        const v = -omega * this.amplitude * Math.sin(omega * t + this.initialPhase);
+                        const a = -omega * omega * x;
+                        
+                        dataX.push(x); dataV.push(v); dataA.push(a);
+                    });
+                    return { dataX, dataV, dataA };
+                },
+
+                initCharts() {
+                    if (this.chartX) return; // Tránh khởi tạo nhiều lần
+                    const { dataX, dataV, dataA } = this.generateStaticCurves();
+                    const omega = Math.PI;
+                    const vMax = omega * this.amplitude;
+                    const aMax = omega * omega * this.amplitude;
+
+                    const commonOptions = (yTitle, yMax) => ({
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 }, 
+                        scales: {
+                            x: { ticks: { maxTicksLimit: 10, font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+                            y: { title: { display: true, text: yTitle, font: { size: 10, weight: 'bold' } }, min: -yMax * 1.2, max: yMax * 1.2 }
+                        },
+                        plugins: { legend: { display: false } },
+                        interaction: { mode: 'none' } // Tắt hoàn toàn hover tooltip để đảm bảo hiệu năng cực nhẹ
+                    });
+
+                    // Bọc Vue.markRaw để ngăn Proxy Vue gây lag đồ thị
+                    this.chartX = Vue.markRaw(new Chart(document.getElementById('canvasX').getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: this.timeLabels,
+                            datasets: [
+                                { data: dataX, borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.2 },
+                                { data: [{x: '0.00', y: this.amplitude}], backgroundColor: '#1d4ed8', pointRadius: 6, pointHoverRadius: 6 }
+                            ]
+                        },
+                        options: commonOptions('x (cm)', this.amplitude)
+                    }));
+
+                    this.chartV = Vue.markRaw(new Chart(document.getElementById('canvasV').getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: this.timeLabels,
+                            datasets: [
+                                { data: dataV, borderColor: '#f59e0b', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.2 },
+                                { data: [{x: '0.00', y: 0}], backgroundColor: '#b45309', pointRadius: 6, pointHoverRadius: 6 }
+                            ]
+                        },
+                        options: commonOptions('v (cm/s)', vMax)
+                    }));
+
+                    this.chartA = Vue.markRaw(new Chart(document.getElementById('canvasA').getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: this.timeLabels,
+                            datasets: [
+                                { data: dataA, borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.2 },
+                                { data: [{x: '0.00', y: -aMax}], backgroundColor: '#b91c1c', pointRadius: 6, pointHoverRadius: 6 }
+                            ]
+                        },
+                        options: commonOptions('a (cm/s²)', aMax)
+                    }));
+                },
+
+                updateCharts() {
+                    if (!this.chartX) return;
+                    const omega = Math.PI;
+                    const t = this.currentTime;
+
+                    const x = this.amplitude * Math.cos(omega * t + this.initialPhase);
+                    const v = -omega * this.amplitude * Math.sin(omega * t + this.initialPhase);
+                    const a = -omega * omega * x;
+
+                    this.liveX = x.toFixed(2);
+                    this.liveV = v.toFixed(2);
+                    this.liveA = a.toFixed(2);
+
+                    const labelTarget = t.toFixed(2);
+
+                    this.chartX.data.datasets[1].data = [{ x: labelTarget, y: x }];
+                    this.chartV.data.datasets[1].data = [{ x: labelTarget, y: v }];
+                    this.chartA.data.datasets[1].data = [{ x: labelTarget, y: a }];
+
+                    // Update 'none' để siêu mượt
+                    this.chartX.update('none');
+                    this.chartV.update('none');
+                    this.chartA.update('none');
+                },
+
+                selectOption(question, option) {
+                    question.selectedOption = option;
+                    question.isAnswered = true;
+                    question.isCorrect = option.isCorrect;
+                    question.feedback = option.feedback;
+                    this.triggerMathJax();
+                },
+
+                getOptionClass(question, option) {
+                    if (!question.isAnswered) return 'bg-slate-50 border-slate-200 hover:border-purple-400 hover:bg-purple-50 text-slate-700';
+                    if (question.selectedOption.id === option.id) {
+                        return option.isCorrect 
+                            ? 'bg-emerald-100 border-emerald-600 text-emerald-900 shadow-sm font-bold' 
+                            : 'bg-rose-100 border-rose-600 text-rose-900 shadow-sm font-bold';
+                    }
+                    return 'bg-white border-slate-100 opacity-45 text-slate-400';
+                },
+
+                checkInput(question) {
+                    question.isAnswered = true;
+                    const processedAns = question.studentAnswer.trim().replace('.', ',');
+                    question.isCorrect = (processedAns === question.correctAnswer);
+                    this.triggerMathJax();
+                },
+
+                resetQuiz() {
+                    this.quizData.forEach(q => {
+                        q.isAnswered = false;
+                        q.isCorrect = false;
+                        if (q.type === 'choice') q.selectedOption = null;
+                        else if (q.type === 'input') q.studentAnswer = '';
+                    });
+                    this.triggerMathJax();
+                },
+
+                triggerMathJax() {
+                    this.$nextTick(() => {
+                        if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+                            window.MathJax.typesetPromise().catch((err) => console.log(err));
+                        }
+                    });
+                }
+            }
+        });
+        
+        app.mount('#app');
+    </script>
+</body>
+</html>
